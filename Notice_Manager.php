@@ -50,26 +50,33 @@ class Notice_Manager {
      * Enqueue the notices. WBF Plugin will hook this function to "init" callback, after "wbf_init".
      */
     function enqueue_notices(){
-        add_action( 'admin_notices', array($this,'show_notices'));
+        add_action( 'admin_notices', array($this,'show_automatic_notices'));
     }
 
     /**
      * Show the notices
      */
-    function show_notices(){
+    public function show_notices($type = "automatic"){
          foreach($this->notices as $id => $notice){
+            if($notice['manual_display'] && $type == "automatic") continue;
+            if(!$notice['manual_display'] && $type == "manual") continue;
+
+            /*
+             * LOL! We need "inline" class for manual notices because WordPress automatically append notices without this class after the first .wrap h1 or the first .wrap h2, see: wp-admin/js/common.js:400
+             */
+
             switch($notice['level']){
                 case 'updated':
                 case 'success':
                     ?>
-                    <div class="updated">
+                    <div class="updated <?php if($notice['manual_display']): ?>inline<?php endif; ?>">
                         <p><?php echo $notice['message']; ?></p>
                     </div>
                     <?php
                     break;
                 case 'error':
                     ?>
-                    <div class="error">
+                    <div class="error <?php if($notice['manual_display']): ?>inline<?php endif; ?>">
                         <p><?php echo $notice['message']; ?></p>
                     </div>
                     <?php
@@ -77,7 +84,7 @@ class Notice_Manager {
                 case 'nag':
                 case 'warning':
                     ?>
-                    <div class="update-nag">
+                    <div class="update-nag <?php if($notice['manual_display']): ?>inline<?php endif; ?>">
                         <p><?php echo $notice['message']; ?></p>
                     </div>
                     <?php
@@ -87,6 +94,14 @@ class Notice_Manager {
 		        $this->remove_notice($id);
 	        }
         }
+    }
+
+    function show_automatic_notices(){
+        $this->show_notices("automatic");
+    }
+
+    function show_manual_notices(){
+        $this->show_notices("manual");
     }
 
     private function get_notices(){
@@ -103,15 +118,17 @@ class Notice_Manager {
 	 * @param String $category (can be anything. Categories are used to group notices for easy clearing them later. If the category is set to "_flash_", however, the notice will be cleared after displaying.
 	 * @param null|String $condition a class name that implements Condition interface
 	 * @param null|mixed $cond_args parameters to pass to $condition constructor
+	 * @param bool $manual_display if TRUE, the notice will not be displayed at "admin_notices" hook.
 	 */
-	function add_notice($id,$message,$level,$category = 'base', $condition = null, $cond_args = null){
+	function add_notice($id,$message,$level,$category = 'base', $condition = null, $cond_args = null, $manual_display = false){
         $notices = $this->get_notices();
         $notices[$id] = array(
             'message' => $message,
             'level'   => $level,
             'category' => $category,
             'condition' => $condition,
-            'condition_args' => $cond_args
+            'condition_args' => $cond_args,
+            'manual_display' => $manual_display,
         );
         $this->notices = $notices;
         $this->update_notices($notices);
